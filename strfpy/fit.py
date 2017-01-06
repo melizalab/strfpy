@@ -58,7 +58,7 @@ def reverse_correlation(stims,psths,width,normalize=None,ridge_param=5e-4,eig_cu
     for i in range(sres):
         STA[i,::-1] = np.correlate(XX[i,:],R,mode="same")
 
-    STA = STA[:,int(round(dsdur/2-tres/2-1)):int(round(dsdur/2+tres/2-1))]
+    STA = STA[:,int(round(dsdur/2-width/2-1)):int(round(dsdur/2+width/2-1))]
     if smooth: STA = sf.gaussian_filter(STA,smooth)
     if rescale: STA /= abs(STA).max()
     return STA
