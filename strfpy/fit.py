@@ -74,7 +74,7 @@ class _fit_strf:
         self.stims = stims
         self.psth_data = psth_data
         self.tres = tres
-        self.STA = reverse_correlation(stims,psth_data,tres,normalize="pseudoinv",smooth=1)
+        self.STA = reverse_correlation(stims,psth_data,tres,normalize="pseudo_inverse",smooth=1)
         self.Sfact, self.Tfact = utils.factorize(self.STA)
         self.channels, self.sres = self.Sfact.shape
 
