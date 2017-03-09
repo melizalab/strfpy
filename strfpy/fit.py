@@ -36,13 +36,13 @@ def reverse_correlation(stims,rs,twidth,offset=True,thresh=None,smooth=0,):
     sta = np.matmul(X.T,R)
     params = np.matmul(np.linalg.pinv(covS),sta)
 
-    if offset: params, offset = np.split(params,[-1])
+    if offset: params, bias = np.split(params,[-1])
 
     strf = params.reshape(nspec,twidth)[:,::-1] 
 
     if thresh: strf[np.abs(strf)/np.abs(strf.max())<thresh] = 0
     if smooth: strf = sf.gaussian_filter(strf,smooth)
-    return strf, offset if offset else strf
+    return strf, bias[0] if offset else strf
 
 
 # hack to avoid multiprocessing pickling errors
