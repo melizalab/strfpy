@@ -12,56 +12,38 @@ import utils
 import emcee
 import time
 
-def reverse_correlation(stims,psths,width,normalize=None,ridge_param=5e-4,eig_cutoff=1e-4,smooth=0,rescale=True):
-    """Calculate spike triggered average (STA) using reverse correlation 
+def reverse_correlation(stims,rs,twidth,offset=True,thresh=None,smooth=0,):
+    """Calculate STRF using normalized reverse correlation 
 
     stims       : array of spectrograms
-    psths       : array of peristimulus time histograms
-    width       : number linear filter time steps  
-    normalize   : method for normalizing the stimulus covariance matrix [None, ridge, pseudo_inverse, inverse]
-    ridge_param : amount of regularization when using ridge regression
-    eig_cutoff  : variance ratio under which eigenvalues will be ignored when using pseudo_inverse  
-    rescale     : scales maximum value of returned STA to one
-
+    rs          : array of responses
+    twidth      : number linear filter time steps  
     """
-    nstim = len(stims)
+    
+    S = np.hstack(stims)
+    S = np.pad(S,((0,0),(twidth-1,0)),"edge")
+    nspec, dsdur = S.shape
 
-    STIM = np.concatenate([s - np.mean(s) for s in stims],1)
-    R = np.concatenate([p - np.mean(p) for p in psths])
+    R = np.hstack(rs)
 
-    sres, dsdur = STIM.shape
-    STA = np.zeros((sres,int(dsdur)))
+    X = np.hstack([sp.linalg.hankel(s[:-twidth+1],s[-twidth:]) for s in S])
+    if offset:
+        ones = np.ones((len(X),1))
+        X = np.hstack((X,ones))
 
 
-    XX = np.asarray(STIM)
+    covS = np.matmul(X.T,X)
+    sta = np.matmul(X.T,R)
+    params = np.matmul(np.linalg.pinv(covS),sta)
 
-    if normalize != None:
-        covXX = np.dot(XX,XX.T)
+    if offset: params, offset = np.split(params,[-1])
 
-        if normalize == "ridge":
-            reg = ridge_param*np.identity(sres)
-            nvcovXX = np.linalg.inv(covXX) + reg
+    strf = params.reshape(nspec,twidth)[:,::-1] 
 
-        if normalize == "pseudo_inverse":
-            U,s,V = np.linalg.svd(covXX)
-            invs = 1/s
-            varexpl = s**2/dsdur
-            varratio = varexpl/np.sum(varexpl)
-            invs[varratio<eig_cutoff] = 0
-            nvcovXX = np.dot(V.T,np.dot(np.diag(invs),U.T))
+    if thresh: strf[np.abs(strf)/np.abs(strf.max())<thresh] = 0
+    if smooth: strf = sf.gaussian_filter(strf,smooth)
+    return strf, offset if offset else strf
 
-        if normalize == "inverse":
-            nvcovXX = np.linalg.inv(covXX)
-
-        XX = np.dot(nvcovXX,XX)
-
-    for i in range(sres):
-        STA[i,::-1] = np.correlate(XX[i,:],R,mode="same")
-
-    STA = STA[:,int(round(dsdur/2-width/2-1)):int(round(dsdur/2+width/2-1))]
-    if smooth: STA = sf.gaussian_filter(STA,smooth)
-    if rescale: STA /= abs(STA).max()
-    return STA
 
 # hack to avoid multiprocessing pickling errors
 # https://github.com/dfm/emcee/issues/148
