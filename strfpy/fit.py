@@ -20,28 +20,26 @@ def reverse_correlation(stims,rs,twidth,offset=True,thresh=None,smooth=0,):
     twidth      : number linear filter time steps  
     """
     
-    S = np.hstack(stims)
-    S = np.pad(S,((0,0),(twidth-1,0)),"edge")
-    nspec, dsdur = S.shape
+    nspec = stims[0].shape[0]
+    
+    X = np.vstack([np.hstack([sp.linalg.hankel(f[:-twidth+1],f[-twidth:]) for f in s]) for s in stims])
+    R = np.hstack(r[twidth-1:] for r in rs)
 
-    R = np.hstack(rs)
-
-    X = np.hstack([sp.linalg.hankel(s[:-twidth+1],s[-twidth:]) for s in S])
     if offset:
         ones = np.ones((len(X),1))
         X = np.hstack((X,ones))
 
 
-    covS = np.matmul(X.T,X)
-    sta = np.matmul(X.T,R)
-    params = np.matmul(np.linalg.pinv(covS),sta)
+    covX = np.matmul(X.T,X)
+    STA = np.matmul(X.T,R)
+    params = np.matmul(np.linalg.pinv(covX),STA)
 
     if offset: params, bias = np.split(params,[-1])
 
     strf = params.reshape(nspec,twidth)[:,::-1] 
 
-    if thresh: strf[np.abs(strf)/np.abs(strf.max())<thresh] = 0
     if smooth: strf = sf.gaussian_filter(strf,smooth)
+    if thresh: strf[np.abs(strf)/np.abs(strf.max())<thresh] = 0
     return strf, bias[0] if offset else strf
 
 
